@@ -38,6 +38,7 @@ import org.openremote.model.Container;
 import org.openremote.model.ContainerService;
 import org.openremote.model.PersistenceEvent;
 import org.openremote.model.asset.Asset;
+import org.openremote.model.asset.GatewayClientType;
 import org.openremote.model.asset.impl.GatewayAsset;
 import org.openremote.model.attribute.AttributeEvent;
 import org.openremote.model.attribute.AttributeMap;
@@ -684,6 +685,7 @@ public class GatewayService extends RouteBuilder implements ContainerService {
             if (!clientId.equals(gateway.getClientId().orElse(null)) || !secret.equals(gateway.getClientSecret().orElse(null))) {
                 gateway.setClientId(clientId);
                 gateway.setClientSecret(secret);
+                gateway.setGatewayClientType(GatewayClientType.Interconnect);
                 assetStorageService.merge(gateway);
             }
 
