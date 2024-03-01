@@ -23,16 +23,20 @@ import io.netty.buffer.ByteBuf;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.keycloak.KeycloakSecurityContext;
 import org.openremote.container.timer.TimerService;
+import org.openremote.manager.asset.AssetProcessingService;
 import org.openremote.manager.asset.AssetStorageService;
 import org.openremote.manager.security.ManagerIdentityService;
 import org.openremote.manager.security.ManagerKeycloakIdentityProvider;
 import org.openremote.model.Container;
+import org.openremote.model.asset.GatewayClientType;
+import org.openremote.model.asset.agent.ConnectionStatus;
+import org.openremote.model.asset.impl.GatewayAsset;
+import org.openremote.model.attribute.AttributeEvent;
+import org.openremote.model.query.AssetQuery;
 import org.openremote.model.syslog.SyslogCategory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import static org.openremote.manager.mqtt.Topic.SINGLE_LEVEL_TOKEN;
@@ -40,16 +44,15 @@ import static org.openremote.model.syslog.SyslogCategory.API;
 
 public class GatewayMQTTHandler extends MQTTHandler {
 
-    protected static final Logger LOG = SyslogCategory.getLogger(API, GatewayMQTTHandler.class);
     public static final String GATEWAY_TOPIC = "gateway";
     public static final String ASSETS_TOPIC = "assets";
     public static final String ATTRIBUTES_TOPIC = "attributes";
-
+    protected static final Logger LOG = SyslogCategory.getLogger(API, GatewayMQTTHandler.class);
+    protected AssetProcessingService assetProcessingService;
     protected TimerService timerService;
     protected AssetStorageService assetStorageService;
     protected ManagerKeycloakIdentityProvider identityProvider;
     protected boolean isKeycloak;
-    protected final ConcurrentMap<Long, Set<RemotingConnection>> provisioningConfigAuthenticatedConnectionMap = new ConcurrentHashMap<>();
 
     @Override
     public void start(Container container) throws Exception {
@@ -57,6 +60,7 @@ public class GatewayMQTTHandler extends MQTTHandler {
         LOG.info("Starting GatewayMQTTHandler");
         timerService = container.getService(TimerService.class);
         assetStorageService = container.getService(AssetStorageService.class);
+        assetProcessingService = container.getService(AssetProcessingService.class);
         ManagerIdentityService identityService = container.getService(ManagerIdentityService.class);
 
         if (!identityService.isKeycloakEnabled()) {
@@ -72,6 +76,7 @@ public class GatewayMQTTHandler extends MQTTHandler {
     public void onConnect(RemotingConnection connection) {
         super.onConnect(connection);
         LOG.fine("New MQTT connection session " + MQTTBrokerService.connectionToString(connection));
+        updateGatewayAssetStatusIfLinked(connection, ConnectionStatus.CONNECTED);
     }
 
     @Override
@@ -79,23 +84,6 @@ public class GatewayMQTTHandler extends MQTTHandler {
         return topicMatches(topic);
     }
 
-    @Override
-    public boolean checkCanSubscribe(RemotingConnection connection, KeycloakSecurityContext securityContext, Topic topic) {
-        if (!canSubscribe(connection, securityContext, topic)) {
-            getLogger().fine("Cannot subscribe to this topic, topic=" + topic + ", " + MQTTBrokerService.connectionToString(connection));
-            return false;
-        }
-        return true;
-    }
-
-    @Override
-    public boolean checkCanPublish(RemotingConnection connection, KeycloakSecurityContext securityContext, Topic topic) {
-        if (!canPublish(connection, securityContext, topic)) {
-            getLogger().fine("Cannot publish to this topic, topic=" + topic + ", " + MQTTBrokerService.connectionToString(connection));
-            return false;
-        }
-        return true;
-    }
 
     @Override
     public boolean topicMatches(Topic topic) {
@@ -129,7 +117,7 @@ public class GatewayMQTTHandler extends MQTTHandler {
     @Override
     public Set<String> getPublishListenerTopics() {
         return Set.of(
-            SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC  + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/"
+                SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/"
         );
     }
 
@@ -151,16 +139,28 @@ public class GatewayMQTTHandler extends MQTTHandler {
 
     @Override
     public void onConnectionLost(RemotingConnection connection) {
-        provisioningConfigAuthenticatedConnectionMap.values().forEach(connections -> connections.remove(connection));
+        updateGatewayAssetStatusIfLinked(connection, ConnectionStatus.DISCONNECTED);
     }
 
     @Override
     public void onDisconnect(RemotingConnection connection) {
-        provisioningConfigAuthenticatedConnectionMap.values().forEach(connections -> connections.remove(connection));
+        updateGatewayAssetStatusIfLinked(connection, ConnectionStatus.DISCONNECTED);
     }
 
+    protected void sendAttributeEvent(AttributeEvent event) {
+        assetProcessingService.sendAttributeEvent(event, GatewayMQTTHandler.class.getName());
+    }
 
+    protected void updateGatewayAssetStatusIfLinked(RemotingConnection connection, ConnectionStatus status) {
+        GatewayAsset gatewayAsset = (GatewayAsset) assetStorageService.find(new AssetQuery()
+                .types(GatewayAsset.class).attributeValue(GatewayAsset.CLIENT_ID.getName(), connection.getClientID()));
 
-
+        if (gatewayAsset != null && gatewayAsset.getGatewayClientType().isPresent()) {
+            if (gatewayAsset.getGatewayClientType().get() == GatewayClientType.MQTT) {
+                LOG.fine("Linked Gateway asset found for MQTT client, updating status to " + status);
+                sendAttributeEvent(new AttributeEvent(gatewayAsset.getId(), GatewayAsset.STATUS, status));
+            }
+        }
+    }
 
 }
