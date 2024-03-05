@@ -28,9 +28,9 @@ import org.openremote.manager.asset.AssetStorageService;
 import org.openremote.manager.security.ManagerIdentityService;
 import org.openremote.manager.security.ManagerKeycloakIdentityProvider;
 import org.openremote.model.Container;
-import org.openremote.model.asset.GatewayClientType;
 import org.openremote.model.asset.agent.ConnectionStatus;
 import org.openremote.model.asset.impl.GatewayAsset;
+import org.openremote.model.asset.impl.GatewayV2Asset;
 import org.openremote.model.attribute.AttributeEvent;
 import org.openremote.model.query.AssetQuery;
 import org.openremote.model.syslog.SyslogCategory;
@@ -152,14 +152,12 @@ public class GatewayMQTTHandler extends MQTTHandler {
     }
 
     protected void updateGatewayAssetStatusIfLinked(RemotingConnection connection, ConnectionStatus status) {
-        GatewayAsset gatewayAsset = (GatewayAsset) assetStorageService.find(new AssetQuery()
-                .types(GatewayAsset.class).attributeValue(GatewayAsset.CLIENT_ID.getName(), connection.getClientID()));
+        GatewayV2Asset gatewayAsset = (GatewayV2Asset) assetStorageService.find(new AssetQuery()
+                .types(GatewayV2Asset.class).attributeValue(GatewayV2Asset.CLIENT_ID.getName(), connection.getClientID()));
 
-        if (gatewayAsset != null && gatewayAsset.getGatewayClientType().isPresent()) {
-            if (gatewayAsset.getGatewayClientType().get() == GatewayClientType.MQTT) {
-                LOG.fine("Linked Gateway asset found for MQTT client, updating status to " + status);
-                sendAttributeEvent(new AttributeEvent(gatewayAsset.getId(), GatewayAsset.STATUS, status));
-            }
+        if (gatewayAsset != null) {
+            LOG.fine("Linked Gateway asset found for MQTT client, updating status to " + status);
+            sendAttributeEvent(new AttributeEvent(gatewayAsset.getId(), GatewayAsset.STATUS, status));
         }
     }
 

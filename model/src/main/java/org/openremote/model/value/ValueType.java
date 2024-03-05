@@ -20,7 +20,6 @@
 package org.openremote.model.value;
 
 import org.openremote.model.Constants;
-import org.openremote.model.asset.GatewayClientType;
 import org.openremote.model.asset.agent.AgentLink;
 import org.openremote.model.asset.agent.ConnectionStatus;
 import org.openremote.model.attribute.AttributeExecuteStatus;
@@ -177,8 +176,6 @@ public final class ValueType {
     public static final ValueDescriptor<AttributeExecuteStatus> EXECUTION_STATUS = new ValueDescriptor<>("executionStatus", AttributeExecuteStatus.class);
 
     public static final ValueDescriptor<ConnectionStatus> CONNECTION_STATUS = new ValueDescriptor<>("connectionStatus", ConnectionStatus.class);
-
-    public static final ValueDescriptor<GatewayClientType> GATEWAY_CLIENT_TYPE = new ValueDescriptor<>("gatewayClientType", GatewayClientType.class);
 
     public static final ValueDescriptor<ConsoleProviders> CONSOLE_PROVIDERS = new ValueDescriptor<>("consoleProviders", ConsoleProviders.class);
 
