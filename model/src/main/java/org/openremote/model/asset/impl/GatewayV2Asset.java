@@ -37,7 +37,7 @@ public class GatewayV2Asset extends Asset<GatewayV2Asset> {
     public static final AttributeDescriptor<String> CLIENT_SECRET = new AttributeDescriptor<>("clientSecret", ValueType.UUID);
     public static final AttributeDescriptor<ConnectionStatus> STATUS = new AttributeDescriptor<>("gatewayStatus", ValueType.CONNECTION_STATUS, new MetaItem<>(MetaItemType.READ_ONLY));
     public static final AttributeDescriptor<Boolean> DISABLED = new AttributeDescriptor<>("disabled", ValueType.BOOLEAN);
-    public static final AssetDescriptor<GatewayV2Asset> DESCRIPTOR = new AssetDescriptor<>("router-wireless", null, GatewayV2Asset.class);
+    public static final AssetDescriptor<GatewayV2Asset> DESCRIPTOR = new AssetDescriptor<>("router-wireless", "5a20cc", GatewayV2Asset.class);
 
     /**
      * For use by hydrators (i.e. JPA/Jackson)
