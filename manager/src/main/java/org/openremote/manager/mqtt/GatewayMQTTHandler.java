@@ -38,6 +38,8 @@ import org.openremote.model.syslog.SyslogCategory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -69,15 +71,14 @@ public class GatewayMQTTHandler extends MQTTHandler {
     public static final int ASSET_ID_TOKEN_INDEX = 4;
     public static final int CLIENT_ID_TOKEN_INDEX = 1;
     public static final int REALM_TOKEN_INDEX = 0;
-
+    protected static final Logger LOG = SyslogCategory.getLogger(API, GatewayMQTTHandler.class);
     protected AssetProcessingService assetProcessingService;
     protected TimerService timerService;
     protected AssetStorageService assetStorageService;
     protected ManagerKeycloakIdentityProvider identityProvider;
-    protected static final Logger LOG = SyslogCategory.getLogger(API, GatewayMQTTHandler.class);
     protected boolean isKeycloak;
 
-     // topic - handler map
+    // topic - handler map
     protected HashMap<String, Consumer<PublishTopicMessage>> topicHandlers = new HashMap<>();
 
     @Override
@@ -179,6 +180,11 @@ public class GatewayMQTTHandler extends MQTTHandler {
 
         //TODO: Authorization and implement
 
+        if (getHandlerFromTopic(topic).isEmpty()) {
+            LOG.warning("No handler found for topic " + topic);
+            return false;
+        }
+
         return true;
     }
 
@@ -186,18 +192,15 @@ public class GatewayMQTTHandler extends MQTTHandler {
     public void onPublish(RemotingConnection connection, Topic topic, ByteBuf body) {
         if (!isGatewayConnection(connection)) {
             LOG.warning("Received message from non-gateway connection " + MQTTBrokerService.connectionToString(connection));
-            return;
         }
 
         // TODO: Authorization
-
-        topicHandlers.forEach(((topicPattern, handler) -> {
-            // Translate MQTT topic patterns with wildcards (+ and #) into regular expressions
-            if (topic.toString().matches(topicPattern.replace("+", "[^/]+").replace("#", ".*"))) {
-                handler.accept(new PublishTopicMessage(connection, topic, body));
-            }
-        }));
-
+        var handler = getHandlerFromTopic(topic);
+        if (handler.isPresent()) {
+            handler.get().accept(new PublishTopicMessage(connection, topic, body));
+        } else {
+            LOG.warning("No handler found for topic " + topic);
+        }
     }
 
     @Override
@@ -209,7 +212,6 @@ public class GatewayMQTTHandler extends MQTTHandler {
     public void onDisconnect(RemotingConnection connection) {
         updateGatewayAssetStatusIfLinked(connection, ConnectionStatus.DISCONNECTED);
     }
-
 
     protected void handleSingleLineAttributeUpdateRequest(PublishTopicMessage message) {
         String assetId = topicTokenIndexToString(message.topic, ASSET_ID_TOKEN_INDEX);
@@ -260,6 +262,21 @@ public class GatewayMQTTHandler extends MQTTHandler {
 
     protected boolean isGatewayConnection(RemotingConnection connection) {
         return assetStorageService.find(new AssetQuery().types(GatewayV2Asset.class).attributeValue(GatewayV2Asset.CLIENT_ID.getName(), connection.getClientID())) != null;
+    }
+
+    protected Optional<Consumer<PublishTopicMessage>> getHandlerFromTopic(Topic topic) {
+        Consumer<PublishTopicMessage> matchedHandler = null;
+        for (Map.Entry<String, Consumer<PublishTopicMessage>> entry : topicHandlers.entrySet()) {
+            String topicPattern = entry.getKey();
+            Consumer<PublishTopicMessage> handler = entry.getValue();
+
+            // Translate MQTT topic patterns with wildcards (+ and #) into regular expressions
+            if (topic.toString().matches(topicPattern.replace("+", "[^/]+").replace("#", ".*"))) {
+                matchedHandler = handler;
+                break;
+            }
+        }
+        return Optional.ofNullable(matchedHandler);
     }
 
     protected record PublishTopicMessage(RemotingConnection connection, Topic topic, ByteBuf body) {
