@@ -64,11 +64,9 @@ public class GatewayMQTTHandler extends MQTTHandler {
     public static final String RESPONSE_TOPIC = "response";
 
     // token indexes
-    public static final int ATTRIBUTES_TOKEN_INDEX = 5;
-    public static final int ATTRIBUTE_NAME_TOKEN_INDEX = ATTRIBUTES_TOKEN_INDEX + 1;
-    public static final int ASSETS_TOKEN_INDEX = 3;
-    public static final int ASSET_ID_TOKEN_INDEX = ASSETS_TOKEN_INDEX + 1;
     public static final int GATEWAY_PREFIX_TOKEN_INDEX = 2;
+    public static final int ATTRIBUTE_NAME_TOKEN_INDEX = 6;
+    public static final int ASSET_ID_TOKEN_INDEX = 4;
     public static final int CLIENT_ID_TOKEN_INDEX = 1;
     public static final int REALM_TOKEN_INDEX = 0;
 
@@ -157,12 +155,15 @@ public class GatewayMQTTHandler extends MQTTHandler {
     }
 
     protected void registerPublishTopicHandlers() {
+        // topic: +/+/gateway/health
         topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + HEALTH_TOPIC,
                 this::handleHealthTopicRequest);
-        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + UPDATE_TOPIC,
-                this::handleMultiLineAttributeUpdateRequest);
+        // topic: +/+/gateway/assets/+/attributes/+/update
         topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + UPDATE_TOPIC,
                 this::handleSingleLineAttributeUpdateRequest);
+        // topic: +/+/gateway/assets/+/attributes/update
+        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + UPDATE_TOPIC,
+                this::handleMultiLineAttributeUpdateRequest);
 
         topicHandlers.forEach((topic, handler) -> {
             LOG.fine("Registered handler for topic " + topic);
