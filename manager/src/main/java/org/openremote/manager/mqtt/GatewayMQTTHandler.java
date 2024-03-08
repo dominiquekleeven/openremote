@@ -20,6 +20,7 @@
 package org.openremote.manager.mqtt;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.keycloak.KeycloakSecurityContext;
 import org.openremote.container.timer.TimerService;
@@ -221,6 +222,10 @@ public class GatewayMQTTHandler extends MQTTHandler {
 
     protected void handleHealthTopicRequest(PublishTopicMessage message) {
         LOG.fine("Received health request message from gateway " + message.connection.getClientID());
+
+        // publish response
+        String responseTopic = message.topic.toString() + "/" + RESPONSE_TOPIC;
+        mqttBrokerService.publishMessage(responseTopic, "OK", MqttQoS.AT_MOST_ONCE);
     }
 
     protected void sendAttributeEvent(AttributeEvent event) {
