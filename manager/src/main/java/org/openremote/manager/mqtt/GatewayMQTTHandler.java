@@ -71,14 +71,16 @@ public class GatewayMQTTHandler extends MQTTHandler {
     public static final int GATEWAY_PREFIX_TOKEN_INDEX = 2;
     public static final int CLIENT_ID_TOKEN_INDEX = 1;
     public static final int REALM_TOKEN_INDEX = 0;
-    protected static final Logger LOG = SyslogCategory.getLogger(API, GatewayMQTTHandler.class);
-    // topic - handler map
-    protected HashMap<String, Consumer<PublishTopicMessage>> topicHandlers = new HashMap<>();
+
     protected AssetProcessingService assetProcessingService;
     protected TimerService timerService;
     protected AssetStorageService assetStorageService;
     protected ManagerKeycloakIdentityProvider identityProvider;
+    protected static final Logger LOG = SyslogCategory.getLogger(API, GatewayMQTTHandler.class);
     protected boolean isKeycloak;
+
+     // topic - handler map
+    protected HashMap<String, Consumer<PublishTopicMessage>> topicHandlers = new HashMap<>();
 
     @Override
     public void start(Container container) throws Exception {
@@ -108,6 +110,8 @@ public class GatewayMQTTHandler extends MQTTHandler {
         super.onConnect(connection);
         LOG.fine("New MQTT connection session " + MQTTBrokerService.connectionToString(connection));
         updateGatewayAssetStatusIfLinked(connection, ConnectionStatus.CONNECTED);
+
+        // TODO: Check whether we allow more than one connection per gateway - ? if not, disconnect the new connection?
     }
 
     @Override
@@ -131,15 +135,20 @@ public class GatewayMQTTHandler extends MQTTHandler {
             LOG.fine("Identity provider is not keycloak");
             return false;
         }
+
+        //TODO: Authorization and implement
+
         return true;
     }
 
     @Override
     public void onSubscribe(RemotingConnection connection, Topic topic) {
+        // TODO:: Implement
     }
 
     @Override
     public void onUnsubscribe(RemotingConnection connection, Topic topic) {
+        // TODO: Implement
     }
 
     @Override
@@ -148,9 +157,12 @@ public class GatewayMQTTHandler extends MQTTHandler {
     }
 
     protected void registerPublishTopicHandlers() {
-        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + HEALTH_TOPIC, this::handleHealthTopicRequest);
-        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + UPDATE_TOPIC, this::handleMultiLineAttributeUpdateRequest);
-        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + UPDATE_TOPIC, this::handleSingleLineAttributeUpdateRequest);
+        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + HEALTH_TOPIC,
+                this::handleHealthTopicRequest);
+        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + UPDATE_TOPIC,
+                this::handleMultiLineAttributeUpdateRequest);
+        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + UPDATE_TOPIC,
+                this::handleSingleLineAttributeUpdateRequest);
 
         topicHandlers.forEach((topic, handler) -> {
             LOG.fine("Registered handler for topic " + topic);
@@ -163,6 +175,9 @@ public class GatewayMQTTHandler extends MQTTHandler {
             LOG.fine("Identity provider is not keycloak");
             return false;
         }
+
+        //TODO: Authorization and implement
+
         return true;
     }
 
@@ -172,6 +187,8 @@ public class GatewayMQTTHandler extends MQTTHandler {
             LOG.warning("Received message from non-gateway connection " + MQTTBrokerService.connectionToString(connection));
             return;
         }
+
+        // TODO: Authorization
 
         topicHandlers.forEach(((topicPattern, handler) -> {
             // Translate MQTT topic patterns with wildcards (+ and #) into regular expressions
@@ -194,7 +211,6 @@ public class GatewayMQTTHandler extends MQTTHandler {
 
 
     protected void handleSingleLineAttributeUpdateRequest(PublishTopicMessage message) {
-        String realm = topicTokenIndexToString(message.topic, REALM_TOKEN_INDEX);
         String assetId = topicTokenIndexToString(message.topic, ASSET_ID_TOKEN_INDEX);
         String attributeName = topicTokenIndexToString(message.topic, ATTRIBUTE_NAME_TOKEN_INDEX);
         String payloadContent = message.body.toString(StandardCharsets.UTF_8);
@@ -208,7 +224,6 @@ public class GatewayMQTTHandler extends MQTTHandler {
     }
 
     protected void handleMultiLineAttributeUpdateRequest(PublishTopicMessage message) {
-        String realm = topicTokenIndexToString(message.topic, REALM_TOKEN_INDEX);
         String assetId = topicTokenIndexToString(message.topic, ASSET_ID_TOKEN_INDEX);
         String attributeName = topicTokenIndexToString(message.topic, ATTRIBUTE_NAME_TOKEN_INDEX);
         String payloadContent = message.body.toString(StandardCharsets.UTF_8);
