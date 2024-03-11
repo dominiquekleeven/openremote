@@ -37,10 +37,7 @@ import org.openremote.model.query.AssetQuery;
 import org.openremote.model.syslog.SyslogCategory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -72,8 +69,10 @@ public class GatewayMQTTHandler extends MQTTHandler {
 
     // token indexes
     public static final int GATEWAY_PREFIX_TOKEN_INDEX = 2;
-    public static final int ATTRIBUTE_NAME_TOKEN_INDEX = 6;
-    public static final int ASSET_ID_TOKEN_INDEX = 4;
+    public static final int OPERATIONS_PREFIX_TOKEN_INDEX = 3;
+    public static final int EVENTS_PREFIX_TOKEN_INDEX = 3;
+    public static final int ATTRIBUTE_NAME_TOKEN_INDEX = 7;
+    public static final int ASSET_ID_TOKEN_INDEX = 5;
     public static final int CLIENT_ID_TOKEN_INDEX = 1;
     public static final int REALM_TOKEN_INDEX = 0;
 
@@ -141,6 +140,16 @@ public class GatewayMQTTHandler extends MQTTHandler {
             return false;
         }
 
+        // only events topics are allowed for subscriptions (unless its the operations topic with a response topic)
+        if (!isEventsTopic(topic)) {
+            if (!isOperationsTopic(topic) && !isResponseTopic(topic)) {
+                LOG.finest("Invalid topic " + topic + " for subscriptions");
+                return false;
+            }
+            LOG.finest("Invalid topic " + topic + " for subscriptions");
+            return false;
+        }
+
         //TODO: Authorization and implement
         return true;
     }
@@ -183,10 +192,16 @@ public class GatewayMQTTHandler extends MQTTHandler {
             return false;
         }
 
+        if (!isOperationsTopic(topic)) {
+            LOG.finest("Invalid topic " + topic + " for publishing" + OPERATIONS_TOPIC);
+            return false;
+        }
+
+
         //TODO: Authorization and implement
 
         if (getHandlerFromTopic(topic).isEmpty()) {
-            LOG.warning("No handler found for topic " + topic);
+            LOG.fine("No handler found for topic " + topic);
             return false;
         }
 
@@ -196,7 +211,8 @@ public class GatewayMQTTHandler extends MQTTHandler {
     @Override
     public void onPublish(RemotingConnection connection, Topic topic, ByteBuf body) {
         if (!isGatewayConnection(connection)) {
-            LOG.warning("Received message from non-gateway connection " + MQTTBrokerService.connectionToString(connection));
+            LOG.info("Received message from non-gateway connection " + MQTTBrokerService.connectionToString(connection));
+            return;
         }
 
         // TODO: Authorization
@@ -204,7 +220,7 @@ public class GatewayMQTTHandler extends MQTTHandler {
         if (handler.isPresent()) {
             handler.get().accept(new PublishTopicMessage(connection, topic, body));
         } else {
-            LOG.warning("No handler found for topic " + topic);
+            LOG.fine("No handler found for topic " + topic);
         }
     }
 
@@ -218,13 +234,14 @@ public class GatewayMQTTHandler extends MQTTHandler {
         updateGatewayAssetStatusIfLinked(connection, ConnectionStatus.DISCONNECTED);
     }
 
+
     protected void handleSingleLineAttributeUpdateRequest(PublishTopicMessage message) {
         String assetId = topicTokenIndexToString(message.topic, ASSET_ID_TOKEN_INDEX);
         String attributeName = topicTokenIndexToString(message.topic, ATTRIBUTE_NAME_TOKEN_INDEX);
         String payloadContent = message.body.toString(StandardCharsets.UTF_8);
 
         if (!Pattern.matches(ASSET_ID_REGEXP, assetId)) {
-            LOG.warning("Received invalid asset ID " + assetId + " in single-line attribute update request from gateway " + message.connection.getClientID());
+            LOG.info("Received invalid asset ID " + assetId + " in single-line attribute update request from gateway " + message.connection.getClientID());
             return;
         }
 
@@ -237,7 +254,7 @@ public class GatewayMQTTHandler extends MQTTHandler {
         String payloadContent = message.body.toString(StandardCharsets.UTF_8);
 
         if (!Pattern.matches(ASSET_ID_REGEXP, assetId)) {
-            LOG.warning("Received invalid asset ID " + assetId + " in multi-line attribute update request from gateway " + message.connection.getClientID());
+            LOG.info("Received invalid asset ID " + assetId + " in multi-line attribute update request from gateway " + message.connection.getClientID());
             return;
         }
         LOG.fine("Received multi-line attribute update request from gateway " + message.connection.getClientID() + " for asset " + assetId + " and attribute " + attributeName + " with payload " + payloadContent);
@@ -263,6 +280,19 @@ public class GatewayMQTTHandler extends MQTTHandler {
             LOG.fine("Linked Gateway asset found for MQTT client, updating connection status to " + status);
             sendAttributeEvent(new AttributeEvent(gatewayAsset.getId(), GatewayAsset.STATUS, status));
         }
+    }
+
+    protected boolean isOperationsTopic(Topic topic) {
+        return Objects.equals(topicTokenIndexToString(topic, OPERATIONS_PREFIX_TOKEN_INDEX), OPERATIONS_TOPIC);
+    }
+
+    protected boolean isResponseTopic(Topic topic) {
+        // check if the last token is “response”
+        return Objects.equals(topicTokenIndexToString(topic, topic.getTokens().size() - 1), RESPONSE_TOPIC);
+    }
+
+    protected boolean isEventsTopic(Topic topic) {
+        return Objects.equals(topicTokenIndexToString(topic, EVENTS_PREFIX_TOKEN_INDEX), EVENTS_TOPIC);
     }
 
     protected boolean isGatewayConnection(RemotingConnection connection) {
