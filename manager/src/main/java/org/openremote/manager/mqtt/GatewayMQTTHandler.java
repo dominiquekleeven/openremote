@@ -52,13 +52,18 @@ import static org.openremote.model.syslog.SyslogCategory.API;
 public class GatewayMQTTHandler extends MQTTHandler {
 
     // main topics
-    public static final String GATEWAY_TOPIC = "gateway";
+    public static final String GATEWAY_TOPIC = "gateway"; // core topic for all gateway-related messages
+    public static final String EVENTS_TOPIC = "events"; // prefix for event topics, users subscribe to these
+    public static final String OPERATIONS_TOPIC = "operations"; // prefix for operation topics, users publish to these (or subscribe to responses)
+
+    // sub-topics
+    public static final String PROVISION_TOPIC = "provision"; // gateway provisioning topic
     public static final String ASSETS_TOPIC = "assets";
     public static final String ATTRIBUTES_TOPIC = "attributes";
-    public static final String PROVISION_TOPIC = "provision";
-    public static final String HEALTH_TOPIC = "health";
+
 
     // operation topics
+    public static final String HEALTH_CHECK_TOPIC = "health-check";
     public static final String CREATE_TOPIC = "create";
     public static final String READ_TOPIC = "read";
     public static final String UPDATE_TOPIC = "update";
@@ -71,6 +76,7 @@ public class GatewayMQTTHandler extends MQTTHandler {
     public static final int ASSET_ID_TOKEN_INDEX = 4;
     public static final int CLIENT_ID_TOKEN_INDEX = 1;
     public static final int REALM_TOKEN_INDEX = 0;
+
     protected static final Logger LOG = SyslogCategory.getLogger(API, GatewayMQTTHandler.class);
     protected AssetProcessingService assetProcessingService;
     protected TimerService timerService;
@@ -136,7 +142,6 @@ public class GatewayMQTTHandler extends MQTTHandler {
         }
 
         //TODO: Authorization and implement
-
         return true;
     }
 
@@ -156,14 +161,14 @@ public class GatewayMQTTHandler extends MQTTHandler {
     }
 
     protected void registerPublishTopicHandlers() {
-        // topic: +/+/gateway/health
-        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + HEALTH_TOPIC,
+        // topic: +/+/gateway/operations/health-check
+        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + OPERATIONS_TOPIC + "/" + HEALTH_CHECK_TOPIC,
                 this::handleHealthTopicRequest);
-        // topic: +/+/gateway/assets/+/attributes/+/update
-        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + UPDATE_TOPIC,
+        // topic: +/+/gateway/operations/assets/+/attributes/+/update
+        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + OPERATIONS_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + UPDATE_TOPIC,
                 this::handleSingleLineAttributeUpdateRequest);
-        // topic: +/+/gateway/assets/+/attributes/update
-        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + UPDATE_TOPIC,
+        // topic: +/+/gateway/operations/assets/+/attributes/update
+        topicHandlers.put(SINGLE_LEVEL_TOKEN + "/" + SINGLE_LEVEL_TOKEN + "/" + GATEWAY_TOPIC + "/" + OPERATIONS_TOPIC + "/" + ASSETS_TOPIC + "/" + SINGLE_LEVEL_TOKEN + "/" + ATTRIBUTES_TOPIC + "/" + UPDATE_TOPIC,
                 this::handleMultiLineAttributeUpdateRequest);
 
         topicHandlers.forEach((topic, handler) -> {
