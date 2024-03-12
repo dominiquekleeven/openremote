@@ -58,14 +58,13 @@ public class GatewayMQTTHandler extends MQTTHandler {
     public static final String ASSETS_TOPIC = "assets";
     public static final String ATTRIBUTES_TOPIC = "attributes";
 
-
     // operation topics
     public static final String HEALTH_CHECK_TOPIC = "health-check";
     public static final String CREATE_TOPIC = "create";
     public static final String READ_TOPIC = "read";
     public static final String UPDATE_TOPIC = "update";
     public static final String DELETE_TOPIC = "delete";
-    public static final String RESPONSE_TOPIC = "response";
+    public static final String RESPONSE_TOPIC = "response"; // response suffix, responses will be published to this topic
 
     // token indexes
     public static final int GATEWAY_PREFIX_TOKEN_INDEX = 2;
